@@ -72,6 +72,8 @@
         , get_decoder/3
         , get_encoder/1
         , get_encoder/2
+        , get_schema/1
+        , get_schema/2
         , maybe_download/1
         , register_schema/2
         , register_schema_with_fp/2
@@ -199,6 +201,23 @@ get_encoder(Ref) ->
 
 -spec get_encoder(name(), fp()) -> avro:simple_encoder().
 get_encoder(Name, Fp) -> get_encoder({Name, Fp}).
+
+-spec get_schema(string()) -> {ok, binary(), binary()} | {error, any()} .
+get_schema(Subject) ->
+  get_schema(Subject, "latest").
+
+-spec get_schema(string(), string() | integer()) -> {ok, binary(), binary()} | {error, any()} .
+get_schema(Subject, Version) when is_integer(Version) ->
+  get_schema(Subject, integer_to_list(Version));
+get_schema(Subject, Version) ->
+  {RegistryURL, BaseHeaders} = get_registry_base_request(),
+  URL = RegistryURL ++ "/subjects/" ++ Subject ++ "/versions/" ++ Version,
+  case httpc_download({URL, BaseHeaders}) of
+    {ok, #{<<"schema">> := Schema, <<"id">> := Id}} ->
+      {ok, Id, Schema};
+    Error ->
+      {error, Error}
+  end.
 
 %% @doc Lookup cache for decoded schema, try to download if not found.
 -spec maybe_download(ref()) -> avro:avro_type().
