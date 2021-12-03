@@ -212,7 +212,7 @@ get_schema(Subject, Version) when is_integer(Version) ->
 get_schema(Subject, Version) ->
   {RegistryURL, BaseHeaders} = get_registry_base_request(),
   URL = RegistryURL ++ "/subjects/" ++ Subject ++ "/versions/" ++ Version,
-  case httpc_download({URL, BaseHeaders}) of
+  case httpc_download_schema({URL, BaseHeaders}) of
     {ok, #{<<"schema">> := Schema, <<"id">> := Id}} ->
       {ok, Id, Schema};
     Error ->
@@ -447,6 +447,23 @@ httpc_download({SchemaRegistryURL, SchemaRegistryHeaders}) ->
                              [?MODULE, SchemaRegistryURL, Other]),
       Other
   end.
+
+httpc_download_schema({SchemaRegistryURL, SchemaRegistryHeaders}) ->
+  case httpc:request(get, {SchemaRegistryURL, SchemaRegistryHeaders},
+    [{timeout, ?HTTPC_TIMEOUT}], []) of
+    {ok, {{_, OK, _}, _RspHeaders, RspBody}} when OK >= 200, OK < 300 ->
+      RespMap = jsone:decode(iolist_to_binary(RspBody)),
+      {ok, RespMap};
+    {ok, {{_, Other, _}, _RspHeaders, RspBody}}->
+      error_logger:error_msg("~p: Failed to download schema from ~s:\n~s",
+        [?MODULE, SchemaRegistryURL, RspBody]),
+      {error, {bad_http_code, Other}};
+    Other ->
+      error_logger:error_msg("~p: Failed to download schema from ~s:\n~p",
+        [?MODULE, SchemaRegistryURL, Other]),
+      Other
+  end.
+
 
 %% Equivalent cURL command:
 %% curl -X POST -H "Content-Type: application/vnd.schemaregistry.v1+json" \
